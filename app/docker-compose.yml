@@ -1,0 +1,14 @@
+traefik:
+  image: traefik
+  command: --web --docker --docker.domain=docker.localhost --logLevel=DEBUG
+  ports:
+    - "80:80"
+    - "8080:8080"
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /dev/null:/traefik.toml
+
+pfae:
+  build: .
+  labels:
+    - "traefik.backend=pfae"
