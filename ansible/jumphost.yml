@@ -1,0 +1,32 @@
+---
+- name: Setup Jumphost
+  hosts: jumphost
+  become: true
+  tasks:
+    - name: Add host DB entries
+      lineinfile:
+        dest: /etc/hosts
+        line: "{{ hostvars[item.1]['ec2_private_ip_address'] }} {{ hostvars[item.1]['ansible_local']['pfae']['role'] }}-{{ item.0 + 1 }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_indexed_items: "{{ groups['db'] }}"
+
+    - name: Add host mongodb entries
+      lineinfile:
+        dest: /etc/hosts
+        line: "{{ hostvars[item.1]['ec2_private_ip_address'] }} {{ hostvars[item.1]['ansible_local']['pfae']['role'] }}-{{ item.0 + 1 }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_indexed_items: "{{ groups['mongodb'] }}"
+
+    - name: Add host app entries
+      lineinfile:
+        dest: /etc/hosts
+        line: "{{ hostvars[item.1]['ec2_private_ip_address'] }} {{ hostvars[item.1]['ansible_local']['pfae']['role'] }}-{{ item.0 + 1 }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_indexed_items: "{{ groups['app'] }}"
+

@@ -1,0 +1,15 @@
+---
+- name: Setup MongoDB
+  hosts: mongodb
+  become: true
+  pre_tasks:
+    - name: Set mongodb Master fact
+      set_fact:
+        mongodb_master: true
+      when: inventory_hostname == groups['mongodb'][0]
+    - name: Set replication set hosts
+      set_fact:
+        mongodb_replication_params: "{{mongodb_replication_params|default([]) + [{ 'host_name': hostvars[item]['ansible_eth0']['ipv4']['address'] }]}}"
+      with_items: groups['mongodb']
+  roles:
+    - greendayonfire.mongodb

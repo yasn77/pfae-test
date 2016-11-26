@@ -1,0 +1,5 @@
+---
+postgresql_server: true
+postgres_rep_user: replication
+project: pfae
+

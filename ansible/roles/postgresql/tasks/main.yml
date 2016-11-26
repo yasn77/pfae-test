@@ -1,0 +1,200 @@
+---
+- name: Install Packages | apt
+  apt:
+    state: latest
+    pkg: postgresql-client
+
+- name: Install Packages | apt
+  apt:
+    state: latest
+    pkg: "{{ item }}"
+  with_items:
+    - postgresql
+    - postgresql-contrib
+    - postgresql-server-dev-all
+    - python-dev
+  when: postgresql_server
+
+- name: Configure | postgres | listen_address
+  lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^#* *listen_addresses ='
+    line: "listen_addresses = '*'"
+  notify: Reload Service | postgres
+  register: listen_address_result
+
+- name: Configure | postgres | data_directory
+  lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^data_directory ='
+    line: "data_directory = '{{ postgresql_data_dir }}'"
+  notify: Reload Service | postgres
+  register: update_datadir
+
+- lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^#* *wal_level ='
+    line: "wal_level = 'hot_standby'"
+  notify: Reload Service | postgres
+
+- lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^#* *max_wal_senders ='
+    line: "max_wal_senders = '16'"
+  notify: Reload Service | postgres
+
+- lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^#* *wal_keep_segments ='
+    line: "wal_keep_segments = '4'"
+  notify: Reload Service | postgres
+
+- lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    regexp: '^#* *max_replication_slots ='
+    line: "max_replication_slots = '2'"
+  notify: Reload Service | postgres
+
+- name: Configure | postgres | pg_hba.conf
+  lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+    regexp: "^#* *host {{ item }}"
+    line: "host {{ item }} {{ database_username | default(project) }} all md5"
+  with_items:
+    - template1
+    - "{{ database_name | default(project) }}"
+  notify: Reload Service | postgres
+
+- name: Add password to .pgpass
+  lineinfile:
+      line: "*:*:*:{{ postgres_rep_user }}:{{ postgres_rep_password }}"
+      regexp: "{{ postgres_rep_user }}"
+      dest: ~/.pgpass
+      create: yes
+      mode: 0600
+  become: true
+  become_user: postgres
+
+- name: Configure | replication | master | pg_hba.conf
+  lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+    regexp: "^host replication {{ postgres_rep_user }} {{ replica_db }}//32 md5"
+    insertafter: "^local.*all.*"
+    line: "host replication {{ postgres_rep_user }} {{ replica_db }}/32 md5"
+  notify: Reload Service | postgres
+  when: postgresql_db_master
+
+- name: Configure | replication | slave | pg_hba.conf
+  lineinfile:
+    state: present
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+    regexp: "^host replication {{ postgres_rep_user }} {{ master_db }}//32 md5"
+    insertafter: "^local.*all.*"
+    line: "host replication {{ postgres_rep_user }} {{ replica_db }}/32 md5"
+  notify: Reload Service | postgres
+  when: not postgresql_db_master
+  register: replication_config
+
+- name: Force Restart of PostgreSQL
+  shell: systemctl restart postgresql
+  when: listen_address_result.changed
+
+- name: Check PG_VERSION
+  shell: "cat {{ postgresql_data_dir }}/PG_VERSION"
+  ignore_errors: true
+  register: PG_VERSION
+
+- name: Run pg_createcluster
+  become: true
+  become_user: postgres
+  shell: "pg_createcluster -d {{ postgresql_data_dir }} -l {{ postgresql_log_path }} {{ postgresql_version }} main"
+  when: not PG_VERSION.stdout == postgresql_version
+
+- name: Install Packages | pip
+  pip:
+    state: latest
+    name: "{{ item }}"
+  with_items:
+    - psycopg2
+  when: postgresql_server
+
+- name: Start PostgreSQL
+  service: name=postgresql state=started
+
+- wait_for:
+    host: '{{ master_db }}'
+    port: 5432
+    delay: 10
+    state: started
+
+- name: Create Database User
+  become: true
+  become_user: postgres
+  postgresql_user:
+    state: present
+    name: "{{ database_username | default(project) }}"
+    password: "{{ database_password | mandatory }}"
+    db: template1
+    priv: CONNECT
+  when: postgresql_server
+
+- name: Create Database
+  become: true
+  become_user: postgres
+  postgresql_db:
+    state: present
+    name: "{{ database_name | default(project) }}"
+    owner: "{{ database_username | default(project) }}"
+  when: postgresql_server
+
+- name: Create Database User
+  become: true
+  become_user: postgres
+  postgresql_user:
+    state: present
+    name: "{{ database_username | default(project) }}"
+    password: "{{ database_password | mandatory }}"
+    db: "{{ database_name | default(project) }}"
+    priv: ALL
+    role_attr_flags: CREATEDB
+  when: postgresql_server
+
+- name: Create replication user
+  become: true
+  become_user: postgres
+  postgresql_user:
+    name: "{{ postgres_rep_user }}"
+    role_attr_flags: "LOGIN,REPLICATION"
+    password: "{{ postgres_rep_password }}"
+
+- name: Stop PostgreSQL for replication prep
+  service:
+    name: postgresql
+    state: stopped
+  when: replication_config.changed and not postgresql_db_master
+
+- name: Remove old files on slave
+  shell: rm -rf /var/lib/postgresql/{{ postgresql_version }}/main/*
+  when: replication_config.changed and not postgresql_db_master
+
+- name: Copy files from master
+  become: true
+  become_user: postgres
+  shell: "pg_basebackup -X stream -h {{ master_db }} -D /var/lib/postgresql/{{ postgresql_version }}/main -U {{ postgres_rep_user }} -v -P"
+  when: replication_config.changed and not postgresql_db_master
+  notify: Reload Service | postgres
+
+- name: Add Recovery file
+  template:
+    src: recovery.conf.j2
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/recovery.conf"
+  notify: Reload Service | postgres
+  when: not postgresql_db_master

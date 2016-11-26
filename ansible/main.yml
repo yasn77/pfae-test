@@ -1,0 +1,17 @@
+---
+- name: Run common role
+  hosts: tag_project_pfae
+  become: true
+  tasks:
+    - group_by:
+        key: "{{ ansible_local['pfae']['role'] }}"
+    - set_fact:
+        master_db: "{{ hostvars[groups['db'][0]]['ansible_eth0']['ipv4']['address'] }}"
+        replica_db: "{{ hostvars[groups['db'][1]]['ansible_eth0']['ipv4']['address'] }}"
+  roles:
+    - common
+
+- include: jumphost.yml
+- include: db.yml
+- include: mongodb.yml
+- include: app.yml

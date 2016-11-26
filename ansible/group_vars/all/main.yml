@@ -1,0 +1,5 @@
+---
+mongodb_root_admin_name: pfae
+database_username: pfae
+ssh_jumphost: "{{ hostvars[groups['tag_role_jumphost'][0]]['ec2_dns_name']}}"
+ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q ubuntu@{{ ssh_jumphost }}"'

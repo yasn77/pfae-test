@@ -1,0 +1,14 @@
+---
+# Bit of a wonky way of updating the config,
+# this is because the config is bind mounted in
+# the container and need to be careful not to
+# update the inode.
+- name: Add pfae config (tmp)
+  template:
+    src: pfae.cfg.j2
+    dest: /tmp/.pfae.cfg.tmp
+  register: output
+
+- name: Copy tmp to config
+  shell: cat /tmp/.pfae.cfg.tmp > /etc/pfae.cfg
+  when: output.changed

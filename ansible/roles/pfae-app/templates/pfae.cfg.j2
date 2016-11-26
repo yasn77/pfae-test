@@ -1,0 +1,4 @@
+SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2://{{ database_username }}:{{ database_password }}@{{ master_db }}/pfae"
+MONGO_USER = "{{ mongodb_root_admin_name }}"
+MONGO_PASSWORD = "{{ mongodb_root_admin_password }}"
+MONGO_HOST = "{{ groups['mongodb'] | map('extract', hostvars, 'ec2_private_ip_address') | list | join(',')}}"

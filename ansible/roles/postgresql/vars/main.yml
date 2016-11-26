@@ -1,0 +1,11 @@
+---
+postgresql_version: '9.5'
+postgresql_user: postgres
+postgresql_runtime_root: /var/run/postgresql
+postgresql_pidfile_path: "/var/run/postgresql/{{ postgresql_version }}-main.pid"
+postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
+
+postgresql_log_root: "/var/log/postgresql"
+postgresql_log_path: "{{ postgresql_log_root }}/postgresql-main.log"
+
+postgresql_accepts_external_connections: yes

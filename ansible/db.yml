@@ -1,0 +1,10 @@
+---
+- name: Setup postgresql
+  hosts: db
+  become: true
+  pre_tasks:
+    - name: Set DB Master fact
+      set_fact:
+        postgresql_db_master: "{% if master_db == hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] %}true{% else %}false{% endif %}"
+  roles:
+    - postgresql

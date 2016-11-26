@@ -1,0 +1,6 @@
+---
+- name: Setup App Servers
+  hosts: app
+  become: true
+  roles:
+    - pfae-app
