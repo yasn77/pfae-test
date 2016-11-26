@@ -18,5 +18,5 @@ pfae:
     - "traefik.frontend.rule=HostRegexp: {.*}"
   volumes:
     - /etc/pfae.cfg:/pfae.cfg
-  environmnet:
+  environment:
     PFAE_CONFIG: /pfae.cfg
