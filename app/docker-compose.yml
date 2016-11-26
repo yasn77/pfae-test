@@ -16,6 +16,7 @@ pfae:
     - "traefik.backend=pfae"
     - "traefik.enable=true"
     - "traefik.frontend.rule=HostRegexp: {.*}"
+    - "traefik.frontend.rule=Path: /, /count, /test, /transfer"
   volumes:
     - /etc/pfae.cfg:/pfae.cfg:ro
   environment:
