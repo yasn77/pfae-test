@@ -9,5 +9,6 @@ COPY pfae.cfg $PFAE_CONFIG
 COPY _web /_web
 
 WORKDIR /_web
+RUN pip install -r requirements.txt
 
 ENTRYPOINT /start.sh
