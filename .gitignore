@@ -90,3 +90,4 @@ ENV/
 
 .direnv/
 .vault_password
+.secrets
