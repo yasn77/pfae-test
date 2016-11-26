@@ -53,7 +53,7 @@ def update_config():
 @app.route('/')
 def slash():
     _check_config_file(os.environ['PFAE_CONFIG'])
-    return json.dumps({}), 200
+    return json.dumps({'app_name': 'pfae'}), 200
 
 
 @app.route('/test')
